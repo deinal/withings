@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    /* Visit https://aka.ms/tsconfig.json to read more about this file */
+    "target": "es2020",
+    "module": "commonjs",
+  },
+  "include": [
+    "server.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
