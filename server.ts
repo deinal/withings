@@ -2,7 +2,10 @@ import * as bodyParser from 'body-parser'
 import * as express from 'express'
 import * as buildUrl from 'build-url'
 import * as querystring from 'querystring'
+import * as moment from 'moment';
 import axios from 'axios'
+
+const fs = require('fs');
 
 const ACCOUNT_URL = 'https://account.withings.com'
 const WBSAPI_URL = 'https://wbsapi.withings.net'
@@ -43,7 +46,9 @@ express()
         console.log('code:', code)
         console.log('state:', state)
 
-        const tokenUrl = buildUrl(ACCOUNT_URL, {path: 'oauth2/token'})
+        const tokenUrl = buildUrl(ACCOUNT_URL, {
+            path: 'oauth2/token'
+        })
         console.log(tokenUrl)
 
         const data = {
@@ -53,25 +58,37 @@ express()
             redirect_uri: CALLBACK_URI,
             code: code as string
         }
-        console.log(data)
+        console.log(querystring.stringify(data).replace(/%2F/gi, '/'))
 
         try {
             // Parameters must be set in the body request as form-data
             // https://github.com/axios/axios#using-applicationx-www-form-urlencoded-format
-            const accessToken = await axios.post(tokenUrl, querystring.stringify(data))
-            console.log(accessToken.data)
-
-            // List devices of returned user
-            const apiUrl = buildUrl(WBSAPI_URL, {path: 'v2/user'})
-            const devices = await axios.get(apiUrl, {
-                headers:{
-                    'Authorization': 'Bearer ' + accessToken.data.access_token
-                },
-                params: {
-                    'action': 'getdevice'
+            const accessToken = await axios.post(tokenUrl, querystring.stringify(data), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 }
             })
-            res.json(devices.data)
+            console.log(accessToken.data)
+
+            const startdateymd = '2020-08-12'
+            const enddateymd = '2020-08-12'
+
+            // List data of returned user
+            const apiUrl = buildUrl(WBSAPI_URL, {
+                path: 'v2/measure',
+                queryParams: {
+                    action: 'getworkouts',
+                    startdateymd: moment(startdateymd).format('YYYY-MM-DD'),
+                    enddateymd: moment(enddateymd).format('YYYY-MM-DD')
+                }
+            })
+            const result = await axios.get(apiUrl, {
+                headers:{
+                    Authorization: `Bearer ${accessToken.data.access_token}`
+                }
+            })
+            fs.writeFile('data.json', JSON.stringify(result.data, null, 4), 'utf8', (err) => {if (err) throw err})
+            res.json(result.data)
         } catch (error) {
             console.log(error)
             res.end(error.message)
