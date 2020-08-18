@@ -1,4 +1,3 @@
-import * as bodyParser from 'body-parser'
 import * as express from 'express'
 import * as buildUrl from 'build-url'
 import * as querystring from 'querystring'
@@ -70,14 +69,16 @@ express()
             })
             console.log(accessToken.data)
 
-            const startdateymd = '2020-08-12'
-            const enddateymd = '2020-08-12'
+            const startdateymd = '2020-08-17'
+            const enddateymd = '2020-08-17'
 
             // List data of returned user
             const apiUrl = buildUrl(WBSAPI_URL, {
-                path: 'v2/measure',
+                path: 'measure',
                 queryParams: {
-                    action: 'getworkouts',
+                    action: 'getmeas',
+                    meastype: '1',
+                    category: '1',
                     startdateymd: moment(startdateymd).format('YYYY-MM-DD'),
                     enddateymd: moment(enddateymd).format('YYYY-MM-DD')
                 }
@@ -88,7 +89,9 @@ express()
                 }
             })
             fs.writeFile('data.json', JSON.stringify(result.data, null, 4), 'utf8', (err) => {if (err) throw err})
-            res.json(result.data)
+            const [measurement] = result.data.body.measuregrps[0].measures
+            const weight = measurement.value * 10 ** measurement.unit
+            res.json(weight)
         } catch (error) {
             console.log(error)
             res.end(error.message)
