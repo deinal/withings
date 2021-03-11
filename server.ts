@@ -4,7 +4,6 @@ import * as querystring from 'querystring'
 import * as moment from 'moment';
 import axios from 'axios'
 
-const fs = require('fs');
 
 const ACCOUNT_URL = 'https://account.withings.com'
 const WBSAPI_URL = 'https://wbsapi.withings.net'
@@ -69,29 +68,44 @@ express()
             })
             console.log(accessToken.data)
 
-            const startdateymd = '2020-08-17'
-            const enddateymd = '2020-08-17'
+            const dataToken = {
+                grant_type: 'refresh_token',
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                refresh_token: accessToken.data.refresh_token,
+            };
+            
+            const refreshedToken = await axios.post(tokenUrl, querystring.stringify(dataToken), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }
+            })
+            console.log('refreshed:', refreshedToken.data)
+
+
+            const startdateymd = '2020-09-03'
+            const enddateymd = '2020-09-04'
+            // const date = '2020-12-02'
 
             // List data of returned user
             const apiUrl = buildUrl(WBSAPI_URL, {
-                path: 'measure',
+                path: 'v2/measure',
                 queryParams: {
-                    action: 'getmeas',
-                    meastype: '1',
-                    category: '1',
-                    startdateymd: moment(startdateymd).format('YYYY-MM-DD'),
-                    enddateymd: moment(enddateymd).format('YYYY-MM-DD')
+                    action: 'getactivity',
+                    startdateymd: startdateymd, //moment(date).unix().toString(),
+                    enddateymd: enddateymd, //moment(date).add(1, 'day').unix().toString(),
+                    data_fields: 'steps,distance,elevation,soft,moderate,intense,active,calories,totalcalories,hr_average,hr_min,hr_max,hr_zone_0,hr_zone_1,hr_zone_2,hr_zone_3',
                 }
             })
+
             const result = await axios.get(apiUrl, {
                 headers:{
-                    Authorization: `Bearer ${accessToken.data.access_token}`
+                    Authorization: `Bearer ${refreshedToken.data.access_token}`
                 }
             })
-            fs.writeFile('data.json', JSON.stringify(result.data, null, 4), 'utf8', (err) => {if (err) throw err})
-            const [measurement] = result.data.body.measuregrps[0].measures
-            const weight = measurement.value * 10 ** measurement.unit
-            res.json(weight)
+
+            res.json(result.data)
+
         } catch (error) {
             console.log(error)
             res.end(error.message)
