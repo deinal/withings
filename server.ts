@@ -4,8 +4,6 @@ import * as querystring from 'querystring'
 import * as moment from 'moment';
 import axios from 'axios'
 
-const fs = require('fs');
-
 const ACCOUNT_URL = 'https://account.withings.com'
 const WBSAPI_URL = 'https://wbsapi.withings.net'
 
@@ -45,12 +43,13 @@ express()
         console.log('code:', code)
         console.log('state:', state)
 
-        const tokenUrl = buildUrl(ACCOUNT_URL, {
-            path: 'oauth2/token'
+        const tokenUrl = buildUrl(WBSAPI_URL, {
+            path: 'v2/oauth2'
         })
         console.log(tokenUrl)
 
         const data = {
+            action: 'requesttoken',
             grant_type: 'authorization_code',
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
@@ -67,31 +66,49 @@ express()
                     'Content-Type': 'application/x-www-form-urlencoded',
                 }
             })
-            console.log(accessToken.data)
+            console.log(accessToken.data.body)
+
+            const refreshUrl = buildUrl(WBSAPI_URL, {
+                path: 'v2/oauth2',
+            })
+            const refreshToken = accessToken.data.body.refresh_token
+            const dataToken = {
+                action: 'requesttoken',
+                grant_type: 'refresh_token',
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                refresh_token: refreshToken,
+            }
+            const refreshedToken = await axios.post(refreshUrl, querystring.stringify(dataToken), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }
+            })
+            console.log('refreshed:', refreshedToken.data.body)
 
             const startdateymd = '2020-08-17'
             const enddateymd = '2020-08-17'
+            // const date = '2020-08-17'
+            // const startdate = moment(date).unix().toString(),
+            // const enddate = moment(date).add(1, 'day').unix().toString(),
 
             // List data of returned user
             const apiUrl = buildUrl(WBSAPI_URL, {
-                path: 'measure',
-                queryParams: {
-                    action: 'getmeas',
-                    meastype: '1',
-                    category: '1',
-                    startdateymd: moment(startdateymd).format('YYYY-MM-DD'),
-                    enddateymd: moment(enddateymd).format('YYYY-MM-DD')
-                }
+                path: 'v2/measure'
             })
-            const result = await axios.get(apiUrl, {
-                headers:{
-                    Authorization: `Bearer ${accessToken.data.access_token}`
-                }
+            const activity = {
+                action: 'getactivity',
+                startdateymd: startdateymd,
+                enddateymd: enddateymd,
+                data_fields: 'steps,distance,elevation,soft,moderate,intense,active,calories,totalcalories,hr_average,hr_min,hr_max,hr_zone_0,hr_zone_1,hr_zone_2,hr_zone_3',
+            }
+            const result = await axios.post(apiUrl, querystring.stringify(activity), {
+                headers: {
+                    Authorization: `Bearer ${refreshedToken.data.body.access_token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
             })
-            fs.writeFile('data.json', JSON.stringify(result.data, null, 4), 'utf8', (err) => {if (err) throw err})
-            const [measurement] = result.data.body.measuregrps[0].measures
-            const weight = measurement.value * 10 ** measurement.unit
-            res.json(weight)
+            res.json(result.data.body)
         } catch (error) {
             console.log(error)
             res.end(error.message)
